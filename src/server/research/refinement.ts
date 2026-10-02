@@ -3,8 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { RefinementQuestion } from "@/lib/research-types";
 import { getEnv } from "@/server/env";
-import { getOpenAI } from "@/server/providers/openai-deep-research";
-import { withRetry } from "@/server/util/errors";
+import { createFastResponse } from "@/server/providers/openai-client";
 import { CLARIFY_SYSTEM_PROMPT, REWRITE_SYSTEM_PROMPT } from "./prompts";
 
 export interface ClarifyResult {
@@ -81,15 +80,11 @@ export function toQuestions(raw: { question: string; rationale?: string; options
 
 export class OpenAIRefinementService implements RefinementService {
   async clarify(query: string): Promise<ClarifyResult> {
-    const openai = getOpenAI();
-    const response = await withRetry(() =>
-      openai.responses.create({
-        model: getEnv().OPENAI_REFINEMENT_MODEL,
-        instructions: CLARIFY_SYSTEM_PROMPT,
-        input: `Research request:\n"""\n${query}\n"""`,
-        text: { format: { type: "json_schema", name: "clarifying_questions", schema: CLARIFY_JSON_SCHEMA, strict: true } },
-      }),
-    );
+    const response = await createFastResponse(getEnv().OPENAI_REFINEMENT_MODEL, {
+      instructions: CLARIFY_SYSTEM_PROMPT,
+      input: `Research request:\n"""\n${query}\n"""`,
+      text: { format: { type: "json_schema", name: "clarifying_questions", schema: CLARIFY_JSON_SCHEMA, strict: true } },
+    });
     const parsed = ClarifySchema.parse(JSON.parse(response.output_text));
     return {
       title: parsed.title.trim().slice(0, 120) || fallbackTitle(query),
@@ -98,14 +93,10 @@ export class OpenAIRefinementService implements RefinementService {
   }
 
   async rewrite(query: string, questions: RefinementQuestion[]): Promise<string> {
-    const openai = getOpenAI();
-    const response = await withRetry(() =>
-      openai.responses.create({
-        model: getEnv().OPENAI_REFINEMENT_MODEL,
-        instructions: REWRITE_SYSTEM_PROMPT,
-        input: `Original research request:\n"""\n${query}\n"""\n\nClarifying questions and the user's answers:\n${formatQuestionsForPrompt(questions)}`,
-      }),
-    );
+    const response = await createFastResponse(getEnv().OPENAI_REFINEMENT_MODEL, {
+      instructions: REWRITE_SYSTEM_PROMPT,
+      input: `Original research request:\n"""\n${query}\n"""\n\nClarifying questions and the user's answers:\n${formatQuestionsForPrompt(questions)}`,
+    });
     const brief = response.output_text.trim();
     if (!brief) throw new Error("OpenAI returned an empty research brief");
     return brief;

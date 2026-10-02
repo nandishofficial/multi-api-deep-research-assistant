@@ -2,9 +2,8 @@ import "server-only";
 import { z } from "zod";
 import { PROVIDER_LABELS, type ProviderName, type ReportSummary, type Source } from "@/lib/research-types";
 import { getEnv } from "@/server/env";
-import { getOpenAI } from "@/server/providers/openai-deep-research";
+import { createFastResponse } from "@/server/providers/openai-client";
 import { SUMMARY_SYSTEM_PROMPT } from "@/server/research/prompts";
-import { withRetry } from "@/server/util/errors";
 
 export interface SummaryInput {
   query: string;
@@ -59,14 +58,11 @@ export class OpenAISummarizer implements Summarizer {
       })
       .join("\n\n");
 
-    const response = await withRetry(() =>
-      getOpenAI().responses.create({
-        model: getEnv().OPENAI_SUMMARY_MODEL,
-        instructions: SUMMARY_SYSTEM_PROMPT,
-        input: `Research question:\n${input.query}\n\nResearch brief:\n${input.prompt}\n\n${body}`,
-        text: { format: { type: "json_schema", name: "report_summary", schema: SUMMARY_JSON_SCHEMA, strict: true } },
-      }),
-    );
+    const response = await createFastResponse(getEnv().OPENAI_SUMMARY_MODEL, {
+      instructions: SUMMARY_SYSTEM_PROMPT,
+      input: `Research question:\n${input.query}\n\nResearch brief:\n${input.prompt}\n\n${body}`,
+      text: { format: { type: "json_schema", name: "report_summary", schema: SUMMARY_JSON_SCHEMA, strict: true } },
+    });
     const parsed = SummarySchema.parse(JSON.parse(response.output_text));
     const knownUrls = new Set(input.reports.flatMap((r) => r.sources.map((s) => s.url)));
     return {

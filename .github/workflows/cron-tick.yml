@@ -1,0 +1,19 @@
+# Optional: drives the research orchestrator from outside the app.
+# Needed on serverless hosts (Vercel) and on hosts that sleep when idle (Render free).
+# Set repository secrets APP_URL (e.g. https://your-app.onrender.com) and CRON_SECRET.
+name: Orchestrator tick
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    if: ${{ vars.ENABLE_CRON_TICK == 'true' }}
+    steps:
+      - name: Advance due research sessions
+        run: |
+          curl -fsS -X POST "${{ secrets.APP_URL }}/api/cron/tick" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" --max-time 280

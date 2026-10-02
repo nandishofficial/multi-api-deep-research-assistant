@@ -1,20 +1,11 @@
 import "server-only";
-import OpenAI from "openai";
 import type { Response as OpenAIResponse } from "openai/resources/responses/responses";
 import { getEnv } from "@/server/env";
 import { ClassifiedError, classifyError, errorMessage } from "@/server/util/errors";
 import { DEEP_RESEARCH_INSTRUCTIONS } from "@/server/research/prompts";
 import { applyCitations, type RawCitation } from "./citations";
+import { getOpenAI } from "./openai-client";
 import type { DeepResearchProvider, PollResult, StartResult } from "./types";
-
-let client: OpenAI | undefined;
-
-export function getOpenAI(): OpenAI {
-  const key = getEnv().OPENAI_API_KEY;
-  if (!key) throw new ClassifiedError("permanent", "OPENAI_API_KEY is not configured");
-  client ??= new OpenAI({ apiKey: key, maxRetries: 2, timeout: 60_000 });
-  return client;
-}
 
 /** Models found to be unavailable for this API key during this process lifetime. */
 const unavailable = new Set<string>();

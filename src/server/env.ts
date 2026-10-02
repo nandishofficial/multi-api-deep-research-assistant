@@ -68,7 +68,9 @@ let cached: Env | undefined;
 /** Parsed, validated environment. Lazily evaluated so `next build` works without secrets. */
 export function getEnv(): Env {
   if (!cached) {
-    const parsed = EnvSchema.safeParse(process.env);
+    // Hosting dashboards often define unset variables as empty strings; treat those as missing.
+    const raw = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== undefined && v.trim() !== ""));
+    const parsed = EnvSchema.safeParse(raw);
     if (!parsed.success) {
       const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
       throw new Error(`Invalid environment configuration: ${issues}`);

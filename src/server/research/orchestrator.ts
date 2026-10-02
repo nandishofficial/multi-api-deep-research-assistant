@@ -7,7 +7,7 @@ import { buildReportEmail } from "@/server/email/template";
 import { appUrl, getEnv } from "@/server/env";
 import { renderReportPdf, reportFilename } from "@/server/report/pdf";
 import { getServices } from "@/server/services";
-import { backoffMs, classifyError, errorMessage } from "@/server/util/errors";
+import { backoffMs, classifyError, errorMessage, type ClassifiedError } from "@/server/util/errors";
 import { createLogger } from "@/server/util/logger";
 import { loadReportData } from "./report-data";
 import { formatQuestionsForPrompt } from "./refinement";
@@ -102,6 +102,11 @@ async function handleStepError(row: ResearchSessionRow, err: unknown): Promise<R
  * Refinement
  * ------------------------------------------------------------------------- */
 
+/** Errors worth surfacing as a failure rather than degrading around (retry, bad key, missing config). */
+function mustNotDegrade(e: ClassifiedError): boolean {
+  return e.kind === "transient" || e.status === 401 || e.status === 403 || /not configured/i.test(e.message);
+}
+
 async function stepClarify(row: ResearchSessionRow) {
   const { refinement } = getServices();
   let title: string;
@@ -110,7 +115,7 @@ async function stepClarify(row: ResearchSessionRow) {
     ({ title, questions } = await refinement.clarify(row.query));
   } catch (err) {
     const e = classifyError(err);
-    if (e.kind === "transient") throw e;
+    if (mustNotDegrade(e)) throw e;
     // Don't strand the user: continue without questions and say why.
     await repo.addEvent(row.id, `OpenAI could not generate refinement questions (${e.message}); continuing without them.`, "warn");
     return repo.transitionResearch(row.id, "clarifying", { status: "refining", stepAttempts: 0, nextCheckAt: new Date() });
@@ -137,7 +142,7 @@ async function stepRefine(row: ResearchSessionRow) {
     brief = await refinement.rewrite(row.query, row.questions);
   } catch (err) {
     const e = classifyError(err);
-    if (e.kind === "transient") throw e;
+    if (mustNotDegrade(e)) throw e;
     await repo.addEvent(row.id, `OpenAI could not rewrite the brief (${e.message}); using your request and answers verbatim.`, "warn");
     brief = `${row.query.trim()}\n\nClarifications:\n${formatQuestionsForPrompt(row.questions)}`;
   }

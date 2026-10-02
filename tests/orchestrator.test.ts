@@ -234,3 +234,43 @@ describe("research orchestration", () => {
     expect(await tick()).toEqual({ processed: 0 });
   });
 });
+
+describe("refinement degradation", () => {
+  beforeEach(async () => {
+    ({ db, email, userId } = await setupTestEnv());
+  });
+
+  it("continues without questions when clarification fails for a non-fatal reason", async () => {
+    setServicesForTesting({
+      refinement: {
+        clarify: async () => {
+          throw new ClassifiedError("permanent", "Unexpected response shape");
+        },
+        rewrite: async (q) => `Brief for: ${q}`,
+      },
+      email,
+    });
+    const created = await service.createResearch(userId, { query: "Find seed-oil-free restaurants in Austin" });
+    await advanceResearch(created.id);
+    const row = (await repo.getResearch(created.id))!;
+    expect(row.status).toBe("awaiting_approval");
+    expect(row.refinedPrompt).toBe("Brief for: Find seed-oil-free restaurants in Austin");
+  });
+
+  it("fails visibly on an invalid API key instead of skipping refinement", async () => {
+    setServicesForTesting({
+      refinement: {
+        clarify: async () => {
+          throw new ClassifiedError("permanent", "Incorrect API key provided", { status: 401 });
+        },
+        rewrite: async () => "unused",
+      },
+      email,
+    });
+    const created = await service.createResearch(userId, { query: "Find seed-oil-free restaurants in Austin" });
+    await advanceResearch(created.id);
+    const row = (await repo.getResearch(created.id))!;
+    expect(row.status).toBe("failed");
+    expect(row.error).toMatch(/API key/);
+  });
+});
