@@ -1,0 +1,18 @@
+# deps
+node_modules/
+# next
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+# env
+.env
+.env.local
+.env.*.local
+# local artifacts
+/tmp/
+/.data/
+/reports-out/
+coverage/
+.DS_Store
+npm-debug.log*
