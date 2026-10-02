@@ -17,7 +17,9 @@ export class MockDeepResearchProvider implements DeepResearchProvider {
 
   async start({ prompt }: { prompt: string; researchId: string }): Promise<StartResult> {
     const fail = prompt.includes(`[mock-fail-${this.name}]`) ? "-fail" : "";
-    const topic = Buffer.from(prompt.slice(0, 160)).toString("base64url");
+    // Use the first substantive line of the brief (skip preambles ending in ":").
+    const firstLine = prompt.split("\n").map((l) => l.trim()).find((l) => l && !l.endsWith(":")) ?? prompt;
+    const topic = Buffer.from(firstLine.slice(0, 200)).toString("base64url");
     return {
       externalId: `mock-${this.name}-${this.now()}-${this.durationMs}${fail}.${topic}`,
       model: this.name === "openai" ? "mock-deep-research" : "mock-gemini-deep-research",

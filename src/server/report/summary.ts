@@ -106,7 +106,8 @@ export function heuristicSummary(input: SummaryInput): ReportSummary {
   for (const r of input.reports) {
     for (const line of r.markdown.split("\n")) {
       const m = line.match(/^\s*[-*]\s+(.{30,})$/);
-      if (m && insights.length < 6) insights.push(strip(m[1]!));
+      const insight = m ? strip(m[1]!) : "";
+      if (insight && insights.length < 6 && !insights.includes(insight)) insights.push(insight);
     }
   }
 

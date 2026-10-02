@@ -10,6 +10,9 @@ import { fallbackTitle } from "./refinement";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
+const ORDER: Record<string, number> = { openai: 0, gemini: 1 };
+const byProvider = <T extends { provider: string }>(runs: T[]) => [...runs].sort((a, b) => (ORDER[a.provider] ?? 9) - (ORDER[b.provider] ?? 9));
+
 export function toListItem(row: ResearchSessionRow, runs: Pick<ProviderRunRow, "provider" | "status">[]): ResearchListItem {
   return {
     id: row.id,
@@ -19,7 +22,7 @@ export function toListItem(row: ResearchSessionRow, runs: Pick<ProviderRunRow, "
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     completedAt: iso(row.completedAt),
-    providers: runs.map((r) => ({ provider: r.provider as ProviderName, status: r.status })),
+    providers: byProvider(runs).map((r) => ({ provider: r.provider as ProviderName, status: r.status })),
   };
 }
 
@@ -42,7 +45,7 @@ export function toDetail(row: ResearchSessionRow, runs: ProviderRunRow[], events
     updatedAt: row.updatedAt.toISOString(),
     researchStartedAt: iso(row.researchStartedAt),
     completedAt: iso(row.completedAt),
-    runs: runs.map((r) => ({
+    runs: byProvider(runs).map((r) => ({
       provider: r.provider as ProviderName,
       status: r.status,
       model: r.model,

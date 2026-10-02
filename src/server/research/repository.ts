@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
-import { AUTOMATED_STATUSES, PROVIDERS, type ResearchStatus } from "@/lib/research-types";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
+import { AUTOMATED_STATUSES, PROVIDERS, TERMINAL_STATUSES, type ResearchStatus } from "@/lib/research-types";
 import { getDb, schema } from "@/server/db/client";
 import type { ProviderRunRow, ResearchSessionRow } from "@/server/db/schema";
 
@@ -17,6 +17,20 @@ export async function insertResearch(userId: string, query: string): Promise<Res
     .values({ id: randomUUID(), userId, query, status: "clarifying", nextCheckAt: new Date() })
     .returning();
   return row!;
+}
+
+/** Usage counters for per-user quotas. */
+export async function countResearchUsage(userId: string, since: Date): Promise<{ active: number; recent: number }> {
+  const db = await getDb();
+  const [active] = await db
+    .select({ n: count() })
+    .from(researchSessions)
+    .where(and(eq(researchSessions.userId, userId), notInArray(researchSessions.status, [...TERMINAL_STATUSES])));
+  const [recent] = await db
+    .select({ n: count() })
+    .from(researchSessions)
+    .where(and(eq(researchSessions.userId, userId), gte(researchSessions.createdAt, since)));
+  return { active: active?.n ?? 0, recent: recent?.n ?? 0 };
 }
 
 export async function getResearch(id: string): Promise<ResearchSessionRow | undefined> {

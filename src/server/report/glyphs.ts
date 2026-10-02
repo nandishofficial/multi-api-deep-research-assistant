@@ -1,5 +1,6 @@
-import { createRequire } from "node:module";
 import path from "node:path";
+import * as fontkit from "fontkit";
+import { robotoDir } from "./fonts";
 
 /**
  * Report text often contains emoji and symbols (✅ ❌ ⚠️ ★) that the embedded
@@ -36,10 +37,7 @@ let glyphCheck: ((cp: number) => boolean) | null | undefined;
 
 function loadGlyphCheck(): ((cp: number) => boolean) | null {
   try {
-    const require = createRequire(import.meta.url);
-    const fontkit = require("fontkit") as { openSync: (p: string) => { hasGlyphForCodePoint: (cp: number) => boolean } };
-    const fontPath = path.join(path.dirname(require.resolve("pdfmake/package.json")), "fonts", "Roboto", "Roboto-Regular.ttf");
-    const font = fontkit.openSync(fontPath);
+    const font = fontkit.openSync(path.join(robotoDir(), "Roboto-Regular.ttf"));
     const cache = new Map<number, boolean>();
     return (cp) => {
       let v = cache.get(cp);

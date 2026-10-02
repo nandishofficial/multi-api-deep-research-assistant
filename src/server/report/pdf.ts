@@ -1,5 +1,5 @@
-import { createRequire } from "node:module";
 import path from "node:path";
+import pdfmakeModule from "pdfmake";
 import type { Content, TDocumentDefinitions } from "pdfmake/interfaces";
 import {
   PROVIDER_LABELS,
@@ -11,6 +11,7 @@ import {
   type Source,
 } from "@/lib/research-types";
 import { formatDuration } from "@/server/email/template";
+import { robotoDir } from "./fonts";
 import { sanitizeForFont } from "./glyphs";
 import { displayUrl, markdownToPdfmake } from "./markdown-to-pdfmake";
 import { COLORS, STYLES } from "./theme";
@@ -338,9 +339,8 @@ let pdfmake: PdfMakeServer | undefined;
 
 function getPdfMake(): PdfMakeServer {
   if (pdfmake) return pdfmake;
-  const require = createRequire(import.meta.url);
-  const instance = require("pdfmake") as PdfMakeServer;
-  const fontDir = path.join(path.dirname(require.resolve("pdfmake/package.json")), "fonts", "Roboto");
+  const instance = pdfmakeModule as unknown as PdfMakeServer;
+  const fontDir = robotoDir();
   instance.addFonts({
     Roboto: {
       normal: path.join(fontDir, "Roboto-Regular.ttf"),

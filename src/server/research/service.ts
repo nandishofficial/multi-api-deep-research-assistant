@@ -45,8 +45,18 @@ function conflict(row: ResearchSessionRow, expected: string): never {
   throw new HttpError(409, `This research is "${row.status}", expected ${expected}. Refresh to see the latest state.`);
 }
 
+/** Deep research is expensive; cap concurrent and daily runs per user. */
+export const QUOTAS = { maxActive: 3, maxPerDay: Number(process.env.MAX_RESEARCH_PER_DAY ?? 20) };
+
 export async function createResearch(userId: string, input: unknown): Promise<ResearchSessionRow> {
   const { query } = CreateResearchInput.parse(input);
+  const usage = await repo.countResearchUsage(userId, new Date(Date.now() - 24 * 60 * 60_000));
+  if (usage.active >= QUOTAS.maxActive) {
+    throw new HttpError(429, `You already have ${usage.active} research sessions in progress. Finish or cancel one first.`);
+  }
+  if (usage.recent >= QUOTAS.maxPerDay) {
+    throw new HttpError(429, `Daily limit of ${QUOTAS.maxPerDay} research requests reached. Try again tomorrow.`);
+  }
   const row = await repo.insertResearch(userId, query);
   await repo.addEvent(row.id, "Research request received; asking OpenAI for refinement questions.");
   return row;
